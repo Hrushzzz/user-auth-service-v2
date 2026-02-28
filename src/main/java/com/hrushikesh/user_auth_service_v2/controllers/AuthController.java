@@ -3,6 +3,7 @@ package com.hrushikesh.user_auth_service_v2.controllers;
 import com.hrushikesh.user_auth_service_v2.dtos.LoginRequestDTO;
 import com.hrushikesh.user_auth_service_v2.dtos.SignUpRequestDTO;
 import com.hrushikesh.user_auth_service_v2.dtos.UserDTO;
+import com.hrushikesh.user_auth_service_v2.dtos.ValidateTokenDTO;
 import com.hrushikesh.user_auth_service_v2.models.User;
 import com.hrushikesh.user_auth_service_v2.pojos.UserToken;
 import com.hrushikesh.user_auth_service_v2.services.IAuthService;
@@ -118,5 +119,15 @@ public class AuthController {
         Output: boolean
         Type: POST because we will send token in request body
          */
+    }
+
+    @PostMapping("/validateToken")
+    public ResponseEntity<String> validateToken(@RequestBody ValidateTokenDTO validateTokenDTO) {
+        Boolean result = authService.validateToken(validateTokenDTO.getToken());
+        if (result == false) {
+            return new ResponseEntity<>("Please login again, Inconvenience Regretted", HttpStatus.FORBIDDEN);
+        } else {
+            return new ResponseEntity<>("Token is valid", HttpStatus.OK);
+        }
     }
 }

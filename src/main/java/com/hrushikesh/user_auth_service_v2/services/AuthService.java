@@ -11,6 +11,8 @@ import com.hrushikesh.user_auth_service_v2.pojos.UserToken;
 import com.hrushikesh.user_auth_service_v2.repositories.RoleRepo;
 import com.hrushikesh.user_auth_service_v2.repositories.SessionRepo;
 import com.hrushikesh.user_auth_service_v2.repositories.UserRepo;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.MacAlgorithm;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +36,9 @@ public class AuthService implements IAuthService {
 
     @Autowired
     private BCryptPasswordEncoder bCryptPasswordEncoder;
+
+    @Autowired
+    private SecretKey secretKey;
 
     /*
     encode(raw password) return encoded password
@@ -115,7 +120,7 @@ public class AuthService implements IAuthService {
             Map<String, Object> payload = new HashMap<>();
             Long nowInMillis = System.currentTimeMillis();  // return timestamp in Millis
             payload.put("iat", nowInMillis);
-            payload.put("exp", nowInMillis + 10000); //100k milliseconds as expiry time period
+            payload.put("exp", nowInMillis + 10000000); //100k milliseconds as expiry time period
             payload.put("userId" ,user.getId());
             payload.put("iss", "scaler");
             payload.put("scope" , user.getRoles());
@@ -163,6 +168,37 @@ public class AuthService implements IAuthService {
         } else {
             throw new IncorrectPasswordException("Incorrect password entered");
         }
+    }
+
+    public Boolean validateToken(String token) {
+         /*
+        We want to check if this token is in my db or not?
+        In Sessions table
+         */
+
+        Optional<Session> optionalSession = sessionRepo.findByToken(token);
+        if (optionalSession.isEmpty()) {
+            return false;
+        }
+
+        JwtParser jwtParser = Jwts.parser().verifyWith(secretKey).build();
+
+        Claims claims = jwtParser.parseClaimsJws(token).getPayload();
+        System.out.println(claims);
+
+        /*
+        Extracting the payload from the JWT using a parser which contains the secret key
+         */
+        Long expiryTime = (Long) claims.get("exp");
+        Long nowInMillis = System.currentTimeMillis();
+
+        if (nowInMillis > expiryTime) {
+            Session session = optionalSession.get();
+            session.setState(State.INACTIVE);
+            sessionRepo.save(session);
+            return false;
+        }
+        return true;
     }
 
     /*
