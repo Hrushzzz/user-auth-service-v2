@@ -1,5 +1,7 @@
 package com.hrushikesh.user_auth_service_v2.services;
 
+import com.hrushikesh.user_auth_service_v2.clients.KafkaProducerClient;
+import com.hrushikesh.user_auth_service_v2.dtos.EmailDTO;
 import com.hrushikesh.user_auth_service_v2.exceptions.IncorrectPasswordException;
 import com.hrushikesh.user_auth_service_v2.exceptions.UserAlreadyExistsException;
 import com.hrushikesh.user_auth_service_v2.exceptions.UserNotRegisteredException;
@@ -18,6 +20,7 @@ import io.jsonwebtoken.security.MacAlgorithm;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.SecretKey;
 import java.util.*;
@@ -40,6 +43,12 @@ public class AuthService implements IAuthService {
     @Autowired
     private SecretKey secretKey;
 
+    @Autowired
+    private KafkaProducerClient kafkaProducerClient;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     /*
     encode(raw password) return encoded password
     128-bit random salt and cost factor.
@@ -58,6 +67,7 @@ public class AuthService implements IAuthService {
 
     @Override
     public User signup(String name, String email, String password) {
+        System.out.println("Signup called with name: " + name + ", email: " + email);
         /*
         every user should register with a unique email
          */
@@ -93,6 +103,22 @@ public class AuthService implements IAuthService {
         List<Role> roles = new ArrayList<>();
         roles.add(role);
         user.setRoles(roles);
+
+        /*
+        Publish a message to the queue
+         */
+        System.out.println("Publishing message to Kafka topic: Signup for email: " + email);
+        EmailDTO emailDTO = new EmailDTO();
+        emailDTO.setTo(email);
+        emailDTO.setFrom("hrushikesh.tk@gmail.com");
+        emailDTO.setSubject("Welcome to Hrushikesh Application..!");
+        emailDTO.setBody("Hi " + name + ". Thank you for registering to Hrushikesh Application.");
+
+        kafkaProducerClient.sendMessage("SignUp",
+                objectMapper.writeValueAsString(emailDTO));
+
+        System.out.println("Message published to Kafka topic: Signup for email: " + email);
+
 
         return userRepo.save(user);
     }
